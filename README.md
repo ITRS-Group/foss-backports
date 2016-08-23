@@ -3,6 +3,9 @@ README
 
 Backported patches made to open source components are logged in this repository.
 
+More information can be found in the README files contained in the subdirectories, such as changes made by ITRS,
+build setup (server and compiler) as well as configuration options applied.
+
 Naming convention
 -----------------
 
