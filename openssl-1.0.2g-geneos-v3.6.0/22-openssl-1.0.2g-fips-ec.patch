@@ -1,0 +1,517 @@
+From: Joy Latten <joy.latten@canonical.com>
+Decription: [Patch 2/6] Add fips 140-2 support for EC.
+Bug-Ubuntu: http://bugs.launchpad.net/bugs/1553309
+Forwarded: not-needed
+Origin: vendor, http://dl.fedoraproject.org/pub/fedora/linux/development
+
+diff --git a/crypto/ec/ec2_smpl.c b/crypto/ec/ec2_smpl.c
+index 5b27b91..3d7c3b8 100644
+--- a/crypto/ec/ec2_smpl.c
++++ b/crypto/ec/ec2_smpl.c
+@@ -124,11 +124,6 @@ const EC_METHOD *EC_GF2m_simple_method(void)
+         0                       /* field_set_to_one */
+     };
+ 
+-# ifdef OPENSSL_FIPS
+-    if (FIPS_mode())
+-        return fips_ec_gf2m_simple_method();
+-# endif
+-
+     return &ret;
+ }
+ 
+diff --git a/crypto/ec/ec_curve.c b/crypto/ec/ec_curve.c
+index 6dbe9d8..fb4424d 100644
+--- a/crypto/ec/ec_curve.c
++++ b/crypto/ec/ec_curve.c
+@@ -3162,10 +3162,6 @@ EC_GROUP *EC_GROUP_new_by_curve_name(int nid)
+     size_t i;
+     EC_GROUP *ret = NULL;
+ 
+-#ifdef OPENSSL_FIPS
+-    if (FIPS_mode())
+-        return FIPS_ec_group_new_by_curve_name(nid);
+-#endif
+     if (nid <= 0)
+         return NULL;
+ 
+diff --git a/crypto/ec/ec_cvt.c b/crypto/ec/ec_cvt.c
+index 5a832ba..010bd5f 100644
+--- a/crypto/ec/ec_cvt.c
++++ b/crypto/ec/ec_cvt.c
+@@ -82,10 +82,6 @@ EC_GROUP *EC_GROUP_new_curve_GFp(const BIGNUM *p, const BIGNUM *a,
+     const EC_METHOD *meth;
+     EC_GROUP *ret;
+ 
+-#ifdef OPENSSL_FIPS
+-    if (FIPS_mode())
+-        return FIPS_ec_group_new_curve_gfp(p, a, b, ctx);
+-#endif
+ #if defined(OPENSSL_BN_ASM_MONT)
+     /*
+      * This might appear controversial, but the fact is that generic
+@@ -160,10 +156,6 @@ EC_GROUP *EC_GROUP_new_curve_GF2m(const BIGNUM *p, const BIGNUM *a,
+     const EC_METHOD *meth;
+     EC_GROUP *ret;
+ 
+-# ifdef OPENSSL_FIPS
+-    if (FIPS_mode())
+-        return FIPS_ec_group_new_curve_gf2m(p, a, b, ctx);
+-# endif
+     meth = EC_GF2m_simple_method();
+ 
+     ret = EC_GROUP_new(meth);
+diff --git a/crypto/ec/ec_key.c b/crypto/ec/ec_key.c
+index bc94ab5..d3fd257 100644
+--- a/crypto/ec/ec_key.c
++++ b/crypto/ec/ec_key.c
+@@ -64,9 +64,6 @@
+ #include <string.h>
+ #include "ec_lcl.h"
+ #include <openssl/err.h>
+-#ifdef OPENSSL_FIPS
+-# include <openssl/fips.h>
+-#endif
+ 
+ EC_KEY *EC_KEY_new(void)
+ {
+@@ -227,6 +224,38 @@ int EC_KEY_up_ref(EC_KEY *r)
+     return ((i > 1) ? 1 : 0);
+ }
+ 
++#ifdef OPENSSL_FIPS
++
++# include <openssl/evp.h>
++# include <openssl/fips.h>
++# include <openssl/fips_rand.h>
++
++static int fips_check_ec(EC_KEY *key)
++{
++    EVP_PKEY *pk;
++    unsigned char tbs[] = "ECDSA Pairwise Check Data";
++    int ret = 0;
++
++    if ((pk = EVP_PKEY_new()) == NULL)
++        goto err;
++
++    EVP_PKEY_set1_EC_KEY(pk, key);
++
++    if (fips_pkey_signature_test(pk, tbs, -1, NULL, 0, NULL, 0, NULL))
++        ret = 1;
++
++ err:
++    if (ret == 0) {
++        FIPSerr(FIPS_F_FIPS_CHECK_EC, FIPS_R_PAIRWISE_TEST_FAILED);
++        fips_set_selftest_fail();
++    }
++    if (pk)
++        EVP_PKEY_free(pk);
++    return ret;
++}
++
++#endif
++
+ int EC_KEY_generate_key(EC_KEY *eckey)
+ {
+     int ok = 0;
+@@ -235,8 +264,10 @@ int EC_KEY_generate_key(EC_KEY *eckey)
+     EC_POINT *pub_key = NULL;
+ 
+ #ifdef OPENSSL_FIPS
+-    if (FIPS_mode())
+-        return FIPS_ec_key_generate_key(eckey);
++    if (FIPS_selftest_failed()) {
++        FIPSerr(FIPS_F_EC_KEY_GENERATE_KEY, FIPS_R_FIPS_SELFTEST_FAILED);
++        return 0;
++    }
+ #endif
+ 
+     if (!eckey || !eckey->group) {
+@@ -277,6 +308,14 @@ int EC_KEY_generate_key(EC_KEY *eckey)
+     eckey->priv_key = priv_key;
+     eckey->pub_key = pub_key;
+ 
++#ifdef OPENSSL_FIPS
++    if (!fips_check_ec(eckey)) {
++        eckey->priv_key = NULL;
++        eckey->pub_key = NULL;
++        goto err;
++    }
++#endif
++
+     ok = 1;
+ 
+  err:
+@@ -414,10 +453,12 @@ int EC_KEY_set_public_key_affine_coordinates(EC_KEY *key, BIGNUM *x,
+             goto err;
+     }
+     /*
+-     * Check if retrieved coordinates match originals: if not values are out
+-     * of range.
++     * Check if retrieved coordinates match originals and are less
++     * than field order: if not values are out of range.
+      */
+-    if (BN_cmp(x, tx) || BN_cmp(y, ty)) {
++    if (BN_cmp(x, tx) || BN_cmp(y, ty)
++        || (BN_cmp(x, &key->group->field) >= 0)
++        || (BN_cmp(y, &key->group->field) >= 0)) {
+         ECerr(EC_F_EC_KEY_SET_PUBLIC_KEY_AFFINE_COORDINATES,
+               EC_R_COORDINATES_OUT_OF_RANGE);
+         goto err;
+diff --git a/crypto/ec/ecp_mont.c b/crypto/ec/ecp_mont.c
+index b2de7fa..bc9fd47 100644
+--- a/crypto/ec/ecp_mont.c
++++ b/crypto/ec/ecp_mont.c
+@@ -63,10 +63,6 @@
+ 
+ #include <openssl/err.h>
+ 
+-#ifdef OPENSSL_FIPS
+-# include <openssl/fips.h>
+-#endif
+-
+ #include "ec_lcl.h"
+ 
+ const EC_METHOD *EC_GFp_mont_method(void)
+@@ -111,11 +107,6 @@ const EC_METHOD *EC_GFp_mont_method(void)
+         ec_GFp_mont_field_set_to_one
+     };
+ 
+-#ifdef OPENSSL_FIPS
+-    if (FIPS_mode())
+-        return fips_ec_gfp_mont_method();
+-#endif
+-
+     return &ret;
+ }
+ 
+diff --git a/crypto/ec/ecp_nist.c b/crypto/ec/ecp_nist.c
+index 3944e24..dbd2558 100644
+--- a/crypto/ec/ecp_nist.c
++++ b/crypto/ec/ecp_nist.c
+@@ -67,10 +67,6 @@
+ #include <openssl/obj_mac.h>
+ #include "ec_lcl.h"
+ 
+-#ifdef OPENSSL_FIPS
+-# include <openssl/fips.h>
+-#endif
+-
+ const EC_METHOD *EC_GFp_nist_method(void)
+ {
+     static const EC_METHOD ret = {
+@@ -113,11 +109,6 @@ const EC_METHOD *EC_GFp_nist_method(void)
+         0                       /* field_set_to_one */
+     };
+ 
+-#ifdef OPENSSL_FIPS
+-    if (FIPS_mode())
+-        return fips_ec_gfp_nist_method();
+-#endif
+-
+     return &ret;
+ }
+ 
+diff --git a/crypto/ec/ecp_smpl.c b/crypto/ec/ecp_smpl.c
+index 2b84821..b0e69cb 100644
+--- a/crypto/ec/ecp_smpl.c
++++ b/crypto/ec/ecp_smpl.c
+@@ -66,10 +66,6 @@
+ #include <openssl/err.h>
+ #include <openssl/symhacks.h>
+ 
+-#ifdef OPENSSL_FIPS
+-# include <openssl/fips.h>
+-#endif
+-
+ #include "ec_lcl.h"
+ 
+ const EC_METHOD *EC_GFp_simple_method(void)
+@@ -114,11 +110,6 @@ const EC_METHOD *EC_GFp_simple_method(void)
+         0                       /* field_set_to_one */
+     };
+ 
+-#ifdef OPENSSL_FIPS
+-    if (FIPS_mode())
+-        return fips_ec_gfp_simple_method();
+-#endif
+-
+     return &ret;
+ }
+ 
+@@ -187,6 +178,11 @@ int ec_GFp_simple_group_set_curve(EC_GROUP *group,
+         return 0;
+     }
+ 
++    if (BN_num_bits(p) < 256) {
++        ECerr(EC_F_EC_GFP_SIMPLE_GROUP_SET_CURVE, EC_R_UNSUPPORTED_FIELD);
++        return 0;
++    }
++
+     if (ctx == NULL) {
+         ctx = new_ctx = BN_CTX_new();
+         if (ctx == NULL)
+diff --git a/crypto/ecdh/ecdhtest.c b/crypto/ecdh/ecdhtest.c
+index 2fe2c66..4d6594a 100644
+--- a/crypto/ecdh/ecdhtest.c
++++ b/crypto/ecdh/ecdhtest.c
+@@ -501,11 +501,13 @@ int main(int argc, char *argv[])
+         goto err;
+ 
+     /* NIST PRIME CURVES TESTS */
++# if 0
+     if (!test_ecdh_curve
+         (NID_X9_62_prime192v1, "NIST Prime-Curve P-192", ctx, out))
+         goto err;
+     if (!test_ecdh_curve(NID_secp224r1, "NIST Prime-Curve P-224", ctx, out))
+         goto err;
++# endif
+     if (!test_ecdh_curve
+         (NID_X9_62_prime256v1, "NIST Prime-Curve P-256", ctx, out))
+         goto err;
+@@ -536,13 +538,14 @@ int main(int argc, char *argv[])
+     if (!test_ecdh_curve(NID_sect571r1, "NIST Binary-Curve B-571", ctx, out))
+         goto err;
+ # endif
++# if 0
+     if (!test_ecdh_kat(out, "Brainpool Prime-Curve brainpoolP256r1", 256))
+         goto err;
+     if (!test_ecdh_kat(out, "Brainpool Prime-Curve brainpoolP384r1", 384))
+         goto err;
+     if (!test_ecdh_kat(out, "Brainpool Prime-Curve brainpoolP512r1", 512))
+         goto err;
+-
++# endif
+     ret = 0;
+ 
+  err:
+diff --git a/crypto/ecdh/ech_lib.c b/crypto/ecdh/ech_lib.c
+index cbc21d1..aa7954a 100644
+--- a/crypto/ecdh/ech_lib.c
++++ b/crypto/ecdh/ech_lib.c
+@@ -93,14 +93,7 @@ void ECDH_set_default_method(const ECDH_METHOD *meth)
+ const ECDH_METHOD *ECDH_get_default_method(void)
+ {
+     if (!default_ECDH_method) {
+-#ifdef OPENSSL_FIPS
+-        if (FIPS_mode())
+-            return FIPS_ecdh_openssl();
+-        else
+-            return ECDH_OpenSSL();
+-#else
+         default_ECDH_method = ECDH_OpenSSL();
+-#endif
+     }
+     return default_ECDH_method;
+ }
+diff --git a/crypto/ecdh/ech_ossl.c b/crypto/ecdh/ech_ossl.c
+index df115cc..3908dfa 100644
+--- a/crypto/ecdh/ech_ossl.c
++++ b/crypto/ecdh/ech_ossl.c
+@@ -78,6 +78,10 @@
+ #include <openssl/obj_mac.h>
+ #include <openssl/bn.h>
+ 
++#ifdef OPENSSL_FIPS
++# include <openssl/fips.h>
++#endif
++
+ static int ecdh_compute_key(void *out, size_t len, const EC_POINT *pub_key,
+                             EC_KEY *ecdh,
+                             void *(*KDF) (const void *in, size_t inlen,
+@@ -90,7 +94,7 @@ static ECDH_METHOD openssl_ecdh_meth = {
+     NULL,                       /* init */
+     NULL,                       /* finish */
+ #endif
+-    0,                          /* flags */
++    ECDH_FLAG_FIPS_METHOD,      /* flags */
+     NULL                        /* app_data */
+ };
+ 
+@@ -119,6 +123,13 @@ static int ecdh_compute_key(void *out, size_t outlen, const EC_POINT *pub_key,
+     size_t buflen, len;
+     unsigned char *buf = NULL;
+ 
++#ifdef OPENSSL_FIPS
++    if (FIPS_selftest_failed()) {
++        FIPSerr(FIPS_F_ECDH_COMPUTE_KEY, FIPS_R_FIPS_SELFTEST_FAILED);
++        return -1;
++    }
++#endif
++
+     if (outlen > INT_MAX) {
+         ECDHerr(ECDH_F_ECDH_COMPUTE_KEY, ERR_R_MALLOC_FAILURE); /* sort of,
+                                                                  * anyway */
+diff --git a/crypto/ecdsa/ecdsatest.c b/crypto/ecdsa/ecdsatest.c
+index 0f301f8..0d12f71 100644
+--- a/crypto/ecdsa/ecdsatest.c
++++ b/crypto/ecdsa/ecdsatest.c
+@@ -138,11 +138,14 @@ int restore_rand(void)
+ }
+ 
+ static int fbytes_counter = 0;
+-static const char *numbers[8] = {
++static const char *numbers[10] = {
++    "651056770906015076056810763456358567190100156695615665659",
+     "651056770906015076056810763456358567190100156695615665659",
+     "6140507067065001063065065565667405560006161556565665656654",
+     "8763001015071075675010661307616710783570106710677817767166"
+         "71676178726717",
++    "8763001015071075675010661307616710783570106710677817767166"
++        "71676178726717",
+     "7000000175690566466555057817571571075705015757757057795755"
+         "55657156756655",
+     "1275552191113212300012030439187146164646146646466749494799",
+@@ -158,7 +161,7 @@ int fbytes(unsigned char *buf, int num)
+     int ret;
+     BIGNUM *tmp = NULL;
+ 
+-    if (fbytes_counter >= 8)
++    if (fbytes_counter >= 10)
+         return 0;
+     tmp = BN_new();
+     if (!tmp)
+@@ -532,8 +535,10 @@ int main(void)
+     RAND_seed(rnd_seed, sizeof(rnd_seed));
+ 
+     /* the tests */
++# if 0
+     if (!x9_62_tests(out))
+         goto err;
++# endif
+     if (!test_builtin(out))
+         goto err;
+ 
+diff --git a/crypto/ecdsa/ecs_lib.c b/crypto/ecdsa/ecs_lib.c
+index 8dc1dda..24ef566 100644
+--- a/crypto/ecdsa/ecs_lib.c
++++ b/crypto/ecdsa/ecs_lib.c
+@@ -80,14 +80,7 @@ void ECDSA_set_default_method(const ECDSA_METHOD *meth)
+ const ECDSA_METHOD *ECDSA_get_default_method(void)
+ {
+     if (!default_ECDSA_method) {
+-#ifdef OPENSSL_FIPS
+-        if (FIPS_mode())
+-            return FIPS_ecdsa_openssl();
+-        else
+-            return ECDSA_OpenSSL();
+-#else
+         default_ECDSA_method = ECDSA_OpenSSL();
+-#endif
+     }
+     return default_ECDSA_method;
+ }
+diff --git a/crypto/ecdsa/ecs_ossl.c b/crypto/ecdsa/ecs_ossl.c
+index dd76960..d81cf6b 100644
+--- a/crypto/ecdsa/ecs_ossl.c
++++ b/crypto/ecdsa/ecs_ossl.c
+@@ -60,6 +60,9 @@
+ #include <openssl/err.h>
+ #include <openssl/obj_mac.h>
+ #include <openssl/bn.h>
++#ifdef OPENSSL_FIPS
++# include <openssl/fips.h>
++#endif
+ 
+ static ECDSA_SIG *ecdsa_do_sign(const unsigned char *dgst, int dlen,
+                                 const BIGNUM *, const BIGNUM *,
+@@ -78,7 +81,7 @@ static ECDSA_METHOD openssl_ecdsa_meth = {
+     NULL,                       /* init */
+     NULL,                       /* finish */
+ #endif
+-    0,                          /* flags */
++    ECDSA_FLAG_FIPS_METHOD,     /* flags */
+     NULL                        /* app_data */
+ };
+ 
+@@ -245,6 +248,13 @@ static ECDSA_SIG *ecdsa_do_sign(const unsigned char *dgst, int dgst_len,
+     ECDSA_DATA *ecdsa;
+     const BIGNUM *priv_key;
+ 
++#ifdef OPENSSL_FIPS
++    if (FIPS_selftest_failed()) {
++        FIPSerr(FIPS_F_ECDSA_DO_SIGN, FIPS_R_FIPS_SELFTEST_FAILED);
++        return NULL;
++    }
++#endif
++
+     ecdsa = ecdsa_check(eckey);
+     group = EC_KEY_get0_group(eckey);
+     priv_key = EC_KEY_get0_private_key(eckey);
+@@ -358,6 +368,13 @@ static int ecdsa_do_verify(const unsigned char *dgst, int dgst_len,
+     const EC_GROUP *group;
+     const EC_POINT *pub_key;
+ 
++#ifdef OPENSSL_FIPS
++    if (FIPS_selftest_failed()) {
++        FIPSerr(FIPS_F_ECDSA_DO_VERIFY, FIPS_R_FIPS_SELFTEST_FAILED);
++        return -1;
++    }
++#endif
++
+     /* check input values */
+     if (eckey == NULL || (group = EC_KEY_get0_group(eckey)) == NULL ||
+         (pub_key = EC_KEY_get0_public_key(eckey)) == NULL || sig == NULL) {
+diff --git a/crypto/evp/m_ecdsa.c b/crypto/evp/m_ecdsa.c
+index 803d314..2830069 100644
+--- a/crypto/evp/m_ecdsa.c
++++ b/crypto/evp/m_ecdsa.c
+@@ -136,7 +136,7 @@ static const EVP_MD ecdsa_md = {
+     NID_ecdsa_with_SHA1,
+     NID_ecdsa_with_SHA1,
+     SHA_DIGEST_LENGTH,
+-    EVP_MD_FLAG_PKEY_DIGEST,
++    EVP_MD_FLAG_PKEY_DIGEST | EVP_MD_FLAG_FIPS,
+     init,
+     update,
+     final,
+diff --git a/crypto/fips/Makefile b/crypto/fips/Makefile
+index d5f9ec3..f2802e4 100644
+--- a/crypto/fips/Makefile
++++ b/crypto/fips/Makefile
+@@ -24,13 +24,13 @@ LIBSRC=fips_aes_selftest.c fips_des_selftest.c fips_hmac_selftest.c fips_rand_se
+     fips_rsa_selftest.c fips_sha_selftest.c fips.c fips_dsa_selftest.c  fips_rand.c \
+     fips_rsa_x931g.c fips_post.c fips_drbg_ctr.c fips_drbg_hash.c fips_drbg_hmac.c \
+     fips_drbg_lib.c fips_drbg_rand.c fips_drbg_selftest.c fips_rand_lib.c \
+-    fips_cmac_selftest.c fips_enc.c fips_md.c
++    fips_cmac_selftest.c fips_ecdh_selftest.c fips_ecdsa_selftest.c fips_enc.c fips_md.c
+ 
+ LIBOBJ=fips_aes_selftest.o fips_des_selftest.o fips_hmac_selftest.o fips_rand_selftest.o \
+     fips_rsa_selftest.o fips_sha_selftest.o fips.o fips_dsa_selftest.o  fips_rand.o \
+     fips_rsa_x931g.o fips_post.o fips_drbg_ctr.o fips_drbg_hash.o fips_drbg_hmac.o \
+     fips_drbg_lib.o fips_drbg_rand.o fips_drbg_selftest.o fips_rand_lib.o \
+-    fips_cmac_selftest.o fips_enc.o fips_md.o
++    fips_cmac_selftest.o fips_ecdh_selftest.o fips_ecdsa_selftest.o fips_enc.o fips_md.o
+ 
+ LIBCRYPTO=-L.. -lcrypto
+ 
+diff --git a/crypto/fips/fips.h b/crypto/fips/fips.h
+index deaa0b5..06836bf 100644
+--- a/crypto/fips/fips.h
++++ b/crypto/fips/fips.h
+@@ -93,6 +93,8 @@ extern "C" {
+     void FIPS_corrupt_dsa(void);
+     void FIPS_corrupt_dsa_keygen(void);
+     int FIPS_selftest_dsa(void);
++    int FIPS_selftest_ecdsa(void);
++    int FIPS_selftest_ecdh(void);
+     void FIPS_corrupt_rng(void);
+     void FIPS_rng_stick(void);
+     void FIPS_x931_stick(int onoff);
+diff --git a/crypto/fips/fips_post.c b/crypto/fips/fips_post.c
+index c5fd889..f410c9e 100644
+--- a/crypto/fips/fips_post.c
++++ b/crypto/fips/fips_post.c
+@@ -95,8 +95,12 @@ int FIPS_selftest(void)
+         rv = 0;
+     if (!FIPS_selftest_rsa())
+         rv = 0;
++    if (!FIPS_selftest_ecdsa())
++        rv = 0;
+     if (!FIPS_selftest_dsa())
+         rv = 0;
++    if (!FIPS_selftest_ecdh())
++        rv = 0;
+     return rv;
+ }
+ 

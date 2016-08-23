@@ -1,12 +1,8 @@
-commit a1bbf7c63dc208b24fde36521b31160ef8fc6016
-Author: Joy Latten <joy.latten@canonical.com>
-Date:   Wed Apr 13 18:06:25 2016 -0500
-
-    From: Joy Latten <joy.latten@canonical.com>
-    Description: [PATCH 3/6] Allow MD5 for fips.
-    Bug-Ubuntu: http://bugs.launchpad.net/bugs/1553309
-    Forwarded: not-needed
-    Origin: vendor, http://pkgs.fedoraproject.org/cgit/rpms/openssl.git
+From: Joy Latten <joy.latten@canonical.com>
+Description: [PATCH 3/6] Allow MD5 for fips.
+Bug-Ubuntu: http://bugs.launchpad.net/bugs/1553309
+Forwarded: not-needed
+Origin: vendor, http://dl.fedoraproject.org/pub/fedora/linux/development/
 
 diff --git a/crypto/md5/md5_dgst.c b/crypto/md5/md5_dgst.c
 index 0a28b9b..0c86a49 100644

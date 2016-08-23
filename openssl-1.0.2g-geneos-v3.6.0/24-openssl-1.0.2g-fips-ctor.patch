@@ -1,15 +1,11 @@
-commit ebd8bb4303c805a4c8c20d39ac73af8d51dc2818
-Author: Joy Latten <joy.latten@canonical.com>
-Date:   Wed Apr 13 22:38:57 2016 -0500
-
-    From: Joy Latten <joy.latten@canonical.com>
-    Description: [PATCH 4/6] Additional fips 140-2 compliance changes
-    Bug-Ubuntu: http://bugs.launchpad.net/bugs/1553309
-    Forwarded: not needed
-    Origin: vendor, http://pkgs.fedoraproject.org/cgit/rpms/openssl.git
+From: Joy Latten <joy.latten@canonical.com>
+Description: [PATCH 4/6] Additional fips 140-2 compliance changes
+Bug-Ubuntu: http://bugs.launchpad.net/bugs/1553309
+Forwarded: not needed
+Origin: vendor, http://dl.fedoraproject.org/pub/fedora/linux/development
 
 diff --git a/crypto/fips/fips.c b/crypto/fips/fips.c
-index 29621c9..e5de012 100644
+index aac1553..c1cdd2b 100644
 --- a/crypto/fips/fips.c
 +++ b/crypto/fips/fips.c
 @@ -60,6 +60,8 @@
@@ -127,7 +123,7 @@ index 29621c9..e5de012 100644
                      FIPS_R_FINGERPRINT_DOES_NOT_MATCH);
              fips_selftest_fail = 1;
 diff --git a/crypto/fips/fips.h b/crypto/fips/fips.h
-index 30668c1..9777a73 100644
+index 06836bf..fcc3e1c 100644
 --- a/crypto/fips/fips.h
 +++ b/crypto/fips/fips.h
 @@ -74,6 +74,7 @@ extern "C" {

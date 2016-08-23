@@ -1,19 +1,15 @@
-commit 5ca3772ed217a5e64070b0bc0124554fde145655
-Author: Joy Latten <joy.latten@canonical.com>
-Date:   Wed Apr 13 16:51:04 2016 -0500
-
-    From: Joy Latten <joy.latten@canonical.com>
-    Description: [PATCH 1/6] Add FIPS 140-2 support and define OPENSSL_FIPS
-    Bug-Ubuntu: http://bugs.launchpad.net/bugs/1553309
-    Forwarded: not-needed
-    Origin: vendor, http://pkgs.fedoraproject.org/cgit/rpms/openssl.git/
-    ---
-    Add fips 140-2 selftest and crypto changes for fips mode.
-     - adds the required selftest; run on initialization
-     - define OPENSSL_FIPS via Configure
-     - add FIPS_mode & FIPS_mode_set for apps to query and/or enable fips mode
-     - various crypto changes when in fips mode for compliance
-     Note: Does not enable fips mode since hmac integrity check not included.
+From: Joy Latten <joy.latten@canonical.com>
+Description: [PATCH 1/6] Add FIPS 140-2 support and define OPENSSL_FIPS
+Bug-Ubuntu: http://bugs.launchpad.net/bugs/1553309
+Forwarded: not-needed
+Origin: vendor, http://dl.fedoraproject.org/pub/fedora/linux/development/
+---
+Add fips 140-2 selftest and crypto changes for fips mode.
+ - adds the required selftest; run on initialization
+ - define OPENSSL_FIPS via Configure
+ - add FIPS_mode & FIPS_mode_set for apps to query and/or enable fips mode
+ - various crypto changes when in fips mode for compliance
+ Note: Does not enable fips mode since hmac integrity check not included.
 
 diff --git a/Configure b/Configure
 index 571aefc..1fcc34e 100755
@@ -617,7 +613,7 @@ index f5ddc66..5bae45c 100644
      {ERR_REASON(DSA_R_MODULUS_TOO_LARGE), "modulus too large"},
      {ERR_REASON(DSA_R_NEED_NEW_SETUP_VALUES), "need new setup values"},
 diff --git a/crypto/dsa/dsa_gen.c b/crypto/dsa/dsa_gen.c
-index 15f3bb4..96c4c09 100644
+index 15f3bb4..5847247 100644
 --- a/crypto/dsa/dsa_gen.c
 +++ b/crypto/dsa/dsa_gen.c
 @@ -91,6 +91,16 @@
@@ -683,7 +679,7 @@ index 15f3bb4..96c4c09 100644
 +    BIGNUM *g = NULL, *q = NULL, *p = NULL;
 +    size_t qsize = qbits >> 3;
 +    BN_CTX *ctx = NULL;
-+    
++
 +# ifdef OPENSSL_FIPS
 +    if (FIPS_selftest_failed()) {
 +        FIPSerr(FIPS_F_DSA_BUILTIN_PARAMGEN, FIPS_R_FIPS_SELFTEST_FAILED);
@@ -707,19 +703,19 @@ index 15f3bb4..96c4c09 100644
 +        memcpy(seed, seed_in, seed_len);
 +    else
 +        seed_len = 0;
-+        
++
 +    if ((ctx = BN_CTX_new()) == NULL)
 +        goto err;
-+ 
++
 +    BN_CTX_start(ctx);
-+ 
++
 +    if (!FIPS_dsa_generate_pq(ctx, bits, qbits, evpmd,
 +                              seed, seed_len, &p, &q, counter_ret, cb))
 +        goto err;
-+ 
++
 +    if (!FIPS_dsa_generate_g(ctx, p, q, &g, h_ret, cb))
 +        goto err;
-+ 
++
 +    ok = 1;
 + err:
 +    if (ok) {
@@ -2321,10 +2317,10 @@ index 65e1e21..477b1b0 100644
          EVP_PKEY_CTX_free(pkctx);
 diff --git a/crypto/fips/Makefile b/crypto/fips/Makefile
 new file mode 100644
-index 0000000..b997426
+index 0000000..d5f9ec3
 --- /dev/null
 +++ b/crypto/fips/Makefile
-@@ -0,0 +1,341 @@
+@@ -0,0 +1,374 @@
 +#
 +# OpenSSL/crypto/fips/Makefile
 +#
@@ -2343,7 +2339,7 @@ index 0000000..b997426
 +TEST=fips_test_suite.c fips_randtest.c
 +APPS=
 +
-+PROGRAM= fips_standalone_hmac
++#PROGRAM= fips_standalone_hmac
 +EXE= $(PROGRAM)$(EXE_EXT)
 +
 +LIB=$(TOP)/libcrypto.a
@@ -2446,6 +2442,21 @@ index 0000000..b997426
 +fips_aes_selftest.o: ../../include/openssl/safestack.h
 +fips_aes_selftest.o: ../../include/openssl/stack.h
 +fips_aes_selftest.o: ../../include/openssl/symhacks.h fips_aes_selftest.c
++fips_cmac_selftest.o: ../../include/openssl/asn1.h ../../include/openssl/bio.h
++fips_cmac_selftest.o: ../../include/openssl/cmac.h
++fips_cmac_selftest.o: ../../include/openssl/crypto.h
++fips_cmac_selftest.o: ../../include/openssl/e_os2.h ../../include/openssl/err.h
++fips_cmac_selftest.o: ../../include/openssl/evp.h ../../include/openssl/fips.h
++fips_cmac_selftest.o: ../../include/openssl/lhash.h
++fips_cmac_selftest.o: ../../include/openssl/obj_mac.h
++fips_cmac_selftest.o: ../../include/openssl/objects.h
++fips_cmac_selftest.o: ../../include/openssl/opensslconf.h
++fips_cmac_selftest.o: ../../include/openssl/opensslv.h
++fips_cmac_selftest.o: ../../include/openssl/ossl_typ.h
++fips_cmac_selftest.o: ../../include/openssl/safestack.h
++fips_cmac_selftest.o: ../../include/openssl/stack.h
++fips_cmac_selftest.o: ../../include/openssl/symhacks.h fips_cmac_selftest.c
++fips_cmac_selftest.o: fips_locl.h
 +fips_des_selftest.o: ../../include/openssl/asn1.h ../../include/openssl/bio.h
 +fips_des_selftest.o: ../../include/openssl/crypto.h
 +fips_des_selftest.o: ../../include/openssl/e_os2.h ../../include/openssl/err.h
@@ -2559,6 +2570,15 @@ index 0000000..b997426
 +fips_dsa_selftest.o: ../../include/openssl/stack.h
 +fips_dsa_selftest.o: ../../include/openssl/symhacks.h fips_dsa_selftest.c
 +fips_dsa_selftest.o: fips_locl.h
++fips_enc.o: ../../include/openssl/asn1.h ../../include/openssl/bio.h
++fips_enc.o: ../../include/openssl/crypto.h ../../include/openssl/e_os2.h
++fips_enc.o: ../../include/openssl/err.h ../../include/openssl/evp.h
++fips_enc.o: ../../include/openssl/fips.h ../../include/openssl/lhash.h
++fips_enc.o: ../../include/openssl/obj_mac.h ../../include/openssl/objects.h
++fips_enc.o: ../../include/openssl/opensslconf.h
++fips_enc.o: ../../include/openssl/opensslv.h ../../include/openssl/ossl_typ.h
++fips_enc.o: ../../include/openssl/safestack.h ../../include/openssl/stack.h
++fips_enc.o: ../../include/openssl/symhacks.h fips_enc.c
 +fips_hmac_selftest.o: ../../include/openssl/asn1.h ../../include/openssl/bio.h
 +fips_hmac_selftest.o: ../../include/openssl/crypto.h
 +fips_hmac_selftest.o: ../../include/openssl/e_os2.h ../../include/openssl/err.h
@@ -2573,6 +2593,15 @@ index 0000000..b997426
 +fips_hmac_selftest.o: ../../include/openssl/safestack.h
 +fips_hmac_selftest.o: ../../include/openssl/stack.h
 +fips_hmac_selftest.o: ../../include/openssl/symhacks.h fips_hmac_selftest.c
++fips_md.o: ../../include/openssl/asn1.h ../../include/openssl/bio.h
++fips_md.o: ../../include/openssl/crypto.h ../../include/openssl/e_os2.h
++fips_md.o: ../../include/openssl/err.h ../../include/openssl/evp.h
++fips_md.o: ../../include/openssl/fips.h ../../include/openssl/lhash.h
++fips_md.o: ../../include/openssl/obj_mac.h ../../include/openssl/objects.h
++fips_md.o: ../../include/openssl/opensslconf.h ../../include/openssl/opensslv.h
++fips_md.o: ../../include/openssl/ossl_typ.h ../../include/openssl/safestack.h
++fips_md.o: ../../include/openssl/stack.h ../../include/openssl/symhacks.h
++fips_md.o: fips_md.c
 +fips_post.o: ../../include/openssl/aes.h ../../include/openssl/asn1.h
 +fips_post.o: ../../include/openssl/bio.h ../../include/openssl/crypto.h
 +fips_post.o: ../../include/openssl/dsa.h ../../include/openssl/e_os2.h
@@ -2668,7 +2697,7 @@ index 0000000..b997426
 +fips_sha_selftest.o: ../../include/openssl/symhacks.h fips_sha_selftest.c
 diff --git a/crypto/fips/fips.c b/crypto/fips/fips.c
 new file mode 100644
-index 0000000..29621c9
+index 0000000..aac1553
 --- /dev/null
 +++ b/crypto/fips/fips.c
 @@ -0,0 +1,483 @@
@@ -2680,7 +2709,7 @@ index 0000000..29621c9
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -3157,7 +3186,7 @@ index 0000000..29621c9
 +#endif
 diff --git a/crypto/fips/fips.h b/crypto/fips/fips.h
 new file mode 100644
-index 0000000..792781e
+index 0000000..deaa0b5
 --- /dev/null
 +++ b/crypto/fips/fips.h
 @@ -0,0 +1,278 @@
@@ -3169,7 +3198,7 @@ index 0000000..792781e
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -3441,7 +3470,7 @@ index 0000000..792781e
 +#endif
 diff --git a/crypto/fips/fips_aes_selftest.c b/crypto/fips/fips_aes_selftest.c
 new file mode 100644
-index 0000000..612ca5e
+index 0000000..ee2a4f1
 --- /dev/null
 +++ b/crypto/fips/fips_aes_selftest.c
 @@ -0,0 +1,365 @@
@@ -3453,7 +3482,7 @@ index 0000000..612ca5e
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -3812,7 +3841,7 @@ index 0000000..612ca5e
 +#endif
 diff --git a/crypto/fips/fips_cmac_selftest.c b/crypto/fips/fips_cmac_selftest.c
 new file mode 100644
-index 0000000..9e75ec9
+index 0000000..02b75c3
 --- /dev/null
 +++ b/crypto/fips/fips_cmac_selftest.c
 @@ -0,0 +1,156 @@
@@ -3824,7 +3853,7 @@ index 0000000..9e75ec9
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -3867,11 +3896,11 @@ index 0000000..9e75ec9
 +
 +#include <string.h>
 +#include <openssl/err.h>
-+#include <openssl/fips.h>
 +#include <openssl/cmac.h>
-+#include "fips_locl.h"
 +
 +#ifdef OPENSSL_FIPS
++#include <openssl/fips.h>
++#include "fips_locl.h"
 +typedef struct {
 +    int nid;
 +    const unsigned char key[EVP_MAX_KEY_LENGTH];
@@ -3974,7 +4003,7 @@ index 0000000..9e75ec9
 +#endif
 diff --git a/crypto/fips/fips_des_selftest.c b/crypto/fips/fips_des_selftest.c
 new file mode 100644
-index 0000000..0743904
+index 0000000..191d5b8
 --- /dev/null
 +++ b/crypto/fips/fips_des_selftest.c
 @@ -0,0 +1,138 @@
@@ -3986,7 +4015,7 @@ index 0000000..0743904
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -4118,10 +4147,10 @@ index 0000000..0743904
 +#endif
 diff --git a/crypto/fips/fips_drbg_ctr.c b/crypto/fips/fips_drbg_ctr.c
 new file mode 100644
-index 0000000..a830b2c
+index 0000000..749655b
 --- /dev/null
 +++ b/crypto/fips/fips_drbg_ctr.c
-@@ -0,0 +1,415 @@
+@@ -0,0 +1,419 @@
 +/* fips/rand/fips_drbg_ctr.c */
 +/* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
 + * project.
@@ -4134,7 +4163,7 @@ index 0000000..a830b2c
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -4178,6 +4207,9 @@ index 0000000..a830b2c
 +#include <stdlib.h>
 +#include <string.h>
 +#include <openssl/crypto.h>
++
++#ifdef OPENSSL_FIPS
++
 +#include <openssl/fips.h>
 +#include <openssl/fips_rand.h>
 +#include "fips_rand_lcl.h"
@@ -4537,12 +4569,13 @@ index 0000000..a830b2c
 +
 +    return 1;
 +}
++#endif
 diff --git a/crypto/fips/fips_drbg_hash.c b/crypto/fips/fips_drbg_hash.c
 new file mode 100644
-index 0000000..b19420a
+index 0000000..93c1f3d
 --- /dev/null
 +++ b/crypto/fips/fips_drbg_hash.c
-@@ -0,0 +1,358 @@
+@@ -0,0 +1,361 @@
 +/* fips/rand/fips_drbg_hash.c */
 +/* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
 + * project.
@@ -4555,7 +4588,7 @@ index 0000000..b19420a
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -4601,6 +4634,8 @@ index 0000000..b19420a
 +#include <stdlib.h>
 +#include <string.h>
 +#include <openssl/crypto.h>
++
++#ifdef OPENSSL_FIPS
 +#include <openssl/fips.h>
 +#include <openssl/fips_rand.h>
 +#include "fips_rand_lcl.h"
@@ -4901,12 +4936,13 @@ index 0000000..b19420a
 +
 +    return 1;
 +}
++#endif
 diff --git a/crypto/fips/fips_drbg_hmac.c b/crypto/fips/fips_drbg_hmac.c
 new file mode 100644
-index 0000000..105db12
+index 0000000..f9eba4c
 --- /dev/null
 +++ b/crypto/fips/fips_drbg_hmac.c
-@@ -0,0 +1,270 @@
+@@ -0,0 +1,273 @@
 +/* fips/rand/fips_drbg_hmac.c */
 +/* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
 + * project.
@@ -4919,7 +4955,7 @@ index 0000000..105db12
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -4966,6 +5002,8 @@ index 0000000..105db12
 +#include <openssl/evp.h>
 +#include <openssl/hmac.h>
 +#include <openssl/aes.h>
++
++#ifdef OPENSSL_FIPS
 +#include <openssl/fips.h>
 +#include <openssl/fips_rand.h>
 +#include "fips_rand_lcl.h"
@@ -5177,12 +5215,13 @@ index 0000000..105db12
 +
 +    return 1;
 +}
++#endif
 diff --git a/crypto/fips/fips_drbg_lib.c b/crypto/fips/fips_drbg_lib.c
 new file mode 100644
-index 0000000..1a71322
+index 0000000..a999b21
 --- /dev/null
 +++ b/crypto/fips/fips_drbg_lib.c
-@@ -0,0 +1,553 @@
+@@ -0,0 +1,556 @@
 +/* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
 + * project.
 + */
@@ -5194,7 +5233,7 @@ index 0000000..1a71322
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -5238,6 +5277,8 @@ index 0000000..1a71322
 +#include <string.h>
 +#include <openssl/crypto.h>
 +#include <openssl/err.h>
++
++#ifdef OPENSSL_FIPS
 +#include <openssl/fips_rand.h>
 +#include "fips_locl.h"
 +#include "fips_rand_lcl.h"
@@ -5736,12 +5777,13 @@ index 0000000..1a71322
 +    memcpy(dctx->lb, out, dctx->blocklength);
 +    return 1;
 +}
++#endif
 diff --git a/crypto/fips/fips_drbg_rand.c b/crypto/fips/fips_drbg_rand.c
 new file mode 100644
-index 0000000..43600dd
+index 0000000..9cd693c
 --- /dev/null
 +++ b/crypto/fips/fips_drbg_rand.c
-@@ -0,0 +1,166 @@
+@@ -0,0 +1,169 @@
 +/* fips/rand/fips_drbg_rand.c */
 +/* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
 + * project.
@@ -5754,7 +5796,7 @@ index 0000000..43600dd
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -5798,6 +5840,8 @@ index 0000000..43600dd
 +#include <string.h>
 +#include <openssl/crypto.h>
 +#include <openssl/err.h>
++
++#ifdef OPENSSL_FIPS
 +#include <openssl/rand.h>
 +#include <openssl/fips_rand.h>
 +#include "fips_rand_lcl.h"
@@ -5908,12 +5952,13 @@ index 0000000..43600dd
 +{
 +    return &rand_drbg_meth;
 +}
++#endif
 diff --git a/crypto/fips/fips_drbg_selftest.c b/crypto/fips/fips_drbg_selftest.c
 new file mode 100644
-index 0000000..1397202
+index 0000000..cc4e61a
 --- /dev/null
 +++ b/crypto/fips/fips_drbg_selftest.c
-@@ -0,0 +1,827 @@
+@@ -0,0 +1,830 @@
 +/* fips/rand/fips_drbg_selftest.c */
 +/* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
 + * project.
@@ -5926,7 +5971,7 @@ index 0000000..1397202
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -5970,6 +6015,8 @@ index 0000000..1397202
 +#include <string.h>
 +#include <openssl/crypto.h>
 +#include <openssl/err.h>
++
++#ifdef OPENSSL_FIPS
 +#include <openssl/fips_rand.h>
 +#include "fips_rand_lcl.h"
 +#include "fips_locl.h"
@@ -6741,9 +6788,10 @@ index 0000000..1397202
 +    FIPS_drbg_free(dctx);
 +    return rv;
 +}
++#endif
 diff --git a/crypto/fips/fips_drbg_selftest.h b/crypto/fips/fips_drbg_selftest.h
 new file mode 100644
-index 0000000..ccc1898
+index 0000000..bb28152
 --- /dev/null
 +++ b/crypto/fips/fips_drbg_selftest.h
 @@ -0,0 +1,1791 @@
@@ -6755,7 +6803,7 @@ index 0000000..ccc1898
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -8540,7 +8588,7 @@ index 0000000..ccc1898
 +};
 diff --git a/crypto/fips/fips_dsa_selftest.c b/crypto/fips/fips_dsa_selftest.c
 new file mode 100644
-index 0000000..4c0da82
+index 0000000..819efcd
 --- /dev/null
 +++ b/crypto/fips/fips_dsa_selftest.c
 @@ -0,0 +1,192 @@
@@ -8552,7 +8600,7 @@ index 0000000..4c0da82
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -8596,13 +8644,13 @@ index 0000000..4c0da82
 +#include <string.h>
 +#include <openssl/crypto.h>
 +#include <openssl/dsa.h>
-+#include <openssl/fips.h>
 +#include <openssl/err.h>
 +#include <openssl/evp.h>
 +#include <openssl/bn.h>
-+#include "fips_locl.h"
 +
 +#ifdef OPENSSL_FIPS
++#include <openssl/fips.h>
++#include "fips_locl.h"
 +
 +static const unsigned char dsa_test_2048_p[] = {
 +    0xa8, 0x53, 0x78, 0xd8, 0xfd, 0x3f, 0x8d, 0x72, 0xec, 0x74, 0x18, 0x08,
@@ -8738,10 +8786,10 @@ index 0000000..4c0da82
 +#endif
 diff --git a/crypto/fips/fips_enc.c b/crypto/fips/fips_enc.c
 new file mode 100644
-index 0000000..a1427b9
+index 0000000..fa3e6fb
 --- /dev/null
 +++ b/crypto/fips/fips_enc.c
-@@ -0,0 +1,189 @@
+@@ -0,0 +1,192 @@
 +/* fipe/evp/fips_enc.c */
 +/* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
 + * All rights reserved.
@@ -8749,21 +8797,21 @@ index 0000000..a1427b9
 + * This package is an SSL implementation written
 + * by Eric Young (eay@cryptsoft.com).
 + * The implementation was written so as to conform with Netscapes SSL.
-+ * 
++ *
 + * This library is free for commercial and non-commercial use as long as
 + * the following conditions are aheared to.  The following conditions
 + * apply to all code found in this distribution, be it the RC4, RSA,
 + * lhash, DES, etc., code; not just the SSL code.  The SSL documentation
 + * included with this distribution is covered by the same copyright terms
 + * except that the holder is Tim Hudson (tjh@cryptsoft.com).
-+ * 
++ *
 + * Copyright remains Eric Young's, and as such any Copyright notices in
 + * the code are not to be removed.
 + * If this package is used in a product, Eric Young should be given attribution
 + * as the author of the parts of the library used.
 + * This can be in the form of a textual message at program startup or
 + * in documentation (online or textual) provided with the package.
-+ * 
++ *
 + * Redistribution and use in source and binary forms, with or without
 + * modification, are permitted provided that the following conditions
 + * are met:
@@ -8778,10 +8826,10 @@ index 0000000..a1427b9
 + *     Eric Young (eay@cryptsoft.com)"
 + *    The word 'cryptographic' can be left out if the rouines from the library
 + *    being used are not cryptographic related :-).
-+ * 4. If you include any Windows specific code (or a derivative thereof) from 
++ * 4. If you include any Windows specific code (or a derivative thereof) from
 + *    the apps directory (application code) you must include an acknowledgement:
 + *    "This product includes software written by Tim Hudson (tjh@cryptsoft.com)"
-+ * 
++ *
 + * THIS SOFTWARE IS PROVIDED BY ERIC YOUNG ``AS IS'' AND
 + * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 + * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -8793,7 +8841,7 @@ index 0000000..a1427b9
 + * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 + * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 + * SUCH DAMAGE.
-+ * 
++ *
 + * The licence and distribution terms for any publically available version or
 + * derivative of this code cannot be changed.  i.e. this code cannot simply be
 + * copied and put under another distribution licence
@@ -8804,6 +8852,8 @@ index 0000000..a1427b9
 +#include <string.h>
 +#include <openssl/evp.h>
 +#include <openssl/err.h>
++
++#ifdef OPENSSL_FIPS
 +#include <openssl/fips.h>
 +
 +const EVP_CIPHER *FIPS_get_cipherbynid(int nid)
@@ -8931,9 +8981,10 @@ index 0000000..a1427b9
 +
 +    }
 +}
++#endif
 diff --git a/crypto/fips/fips_hmac_selftest.c b/crypto/fips/fips_hmac_selftest.c
 new file mode 100644
-index 0000000..ca46450
+index 0000000..3089843
 --- /dev/null
 +++ b/crypto/fips/fips_hmac_selftest.c
 @@ -0,0 +1,134 @@
@@ -8945,7 +8996,7 @@ index 0000000..ca46450
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -9073,7 +9124,7 @@ index 0000000..ca46450
 +#endif
 diff --git a/crypto/fips/fips_locl.h b/crypto/fips/fips_locl.h
 new file mode 100644
-index 0000000..40f873b
+index 0000000..3c3d1bb
 --- /dev/null
 +++ b/crypto/fips/fips_locl.h
 @@ -0,0 +1,71 @@
@@ -9085,7 +9136,7 @@ index 0000000..40f873b
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -9150,10 +9201,10 @@ index 0000000..40f873b
 +#endif
 diff --git a/crypto/fips/fips_md.c b/crypto/fips/fips_md.c
 new file mode 100644
-index 0000000..ef3a439
+index 0000000..4a8f2e4
 --- /dev/null
 +++ b/crypto/fips/fips_md.c
-@@ -0,0 +1,144 @@
+@@ -0,0 +1,147 @@
 +/* fips/evp/fips_md.c */
 +/* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
 + * All rights reserved.
@@ -9161,21 +9212,21 @@ index 0000000..ef3a439
 + * This package is an SSL implementation written
 + * by Eric Young (eay@cryptsoft.com).
 + * The implementation was written so as to conform with Netscapes SSL.
-+ * 
++ *
 + * This library is free for commercial and non-commercial use as long as
 + * the following conditions are aheared to.  The following conditions
 + * apply to all code found in this distribution, be it the RC4, RSA,
 + * lhash, DES, etc., code; not just the SSL code.  The SSL documentation
 + * included with this distribution is covered by the same copyright terms
 + * except that the holder is Tim Hudson (tjh@cryptsoft.com).
-+ * 
++ *
 + * Copyright remains Eric Young's, and as such any Copyright notices in
 + * the code are not to be removed.
 + * If this package is used in a product, Eric Young should be given attribution
 + * as the author of the parts of the library used.
 + * This can be in the form of a textual message at program startup or
 + * in documentation (online or textual) provided with the package.
-+ * 
++ *
 + * Redistribution and use in source and binary forms, with or without
 + * modification, are permitted provided that the following conditions
 + * are met:
@@ -9190,10 +9241,10 @@ index 0000000..ef3a439
 + *     Eric Young (eay@cryptsoft.com)"
 + *    The word 'cryptographic' can be left out if the rouines from the library
 + *    being used are not cryptographic related :-).
-+ * 4. If you include any Windows specific code (or a derivative thereof) from 
++ * 4. If you include any Windows specific code (or a derivative thereof) from
 + *    the apps directory (application code) you must include an acknowledgement:
 + *    "This product includes software written by Tim Hudson (tjh@cryptsoft.com)"
-+ * 
++ *
 + * THIS SOFTWARE IS PROVIDED BY ERIC YOUNG ``AS IS'' AND
 + * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 + * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -9205,7 +9256,7 @@ index 0000000..ef3a439
 + * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 + * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 + * SUCH DAMAGE.
-+ * 
++ *
 + * The licence and distribution terms for any publically available version or
 + * derivative of this code cannot be changed.  i.e. this code cannot simply be
 + * copied and put under another distribution licence
@@ -9219,7 +9270,7 @@ index 0000000..ef3a439
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -9274,6 +9325,8 @@ index 0000000..ef3a439
 +#include <openssl/objects.h>
 +#include <openssl/evp.h>
 +#include <openssl/err.h>
++
++#ifdef OPENSSL_FIPS
 +#include <openssl/fips.h>
 +
 +const EVP_MD *FIPS_get_digestbynid(int nid)
@@ -9298,9 +9351,10 @@ index 0000000..ef3a439
 +        return NULL;
 +    }
 +}
++#endif
 diff --git a/crypto/fips/fips_post.c b/crypto/fips/fips_post.c
 new file mode 100644
-index 0000000..629f5c2
+index 0000000..c5fd889
 --- /dev/null
 +++ b/crypto/fips/fips_post.c
 @@ -0,0 +1,201 @@
@@ -9312,7 +9366,7 @@ index 0000000..629f5c2
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -9507,7 +9561,7 @@ index 0000000..629f5c2
 +#endif
 diff --git a/crypto/fips/fips_rand.c b/crypto/fips/fips_rand.c
 new file mode 100644
-index 0000000..c5060a2
+index 0000000..74d31f0
 --- /dev/null
 +++ b/crypto/fips/fips_rand.c
 @@ -0,0 +1,428 @@
@@ -9519,7 +9573,7 @@ index 0000000..c5060a2
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -9592,10 +9646,10 @@ index 0000000..c5060a2
 +# endif
 +#endif
 +#include <string.h>
-+#include <openssl/fips.h>
-+#include "fips_locl.h"
 +
 +#ifdef OPENSSL_FIPS
++#include <openssl/fips.h>
++#include "fips_locl.h"
 +
 +void *OPENSSL_stderr(void);
 +
@@ -9941,7 +9995,7 @@ index 0000000..c5060a2
 +#endif
 diff --git a/crypto/fips/fips_rand.h b/crypto/fips/fips_rand.h
 new file mode 100644
-index 0000000..e78eb35
+index 0000000..3b44e7d
 --- /dev/null
 +++ b/crypto/fips/fips_rand.h
 @@ -0,0 +1,163 @@
@@ -9953,7 +10007,7 @@ index 0000000..e78eb35
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -10110,7 +10164,7 @@ index 0000000..e78eb35
 +#endif
 diff --git a/crypto/fips/fips_rand_lcl.h b/crypto/fips/fips_rand_lcl.h
 new file mode 100644
-index 0000000..0a1d251
+index 0000000..352803f
 --- /dev/null
 +++ b/crypto/fips/fips_rand_lcl.h
 @@ -0,0 +1,213 @@
@@ -10126,7 +10180,7 @@ index 0000000..0a1d251
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -10329,10 +10383,10 @@ index 0000000..0a1d251
 +#define M_EVP_MD_size EVP_MD_size
 diff --git a/crypto/fips/fips_rand_lib.c b/crypto/fips/fips_rand_lib.c
 new file mode 100644
-index 0000000..6f2ccc6
+index 0000000..a2054a0
 --- /dev/null
 +++ b/crypto/fips/fips_rand_lib.c
-@@ -0,0 +1,181 @@
+@@ -0,0 +1,184 @@
 +/* ====================================================================
 + * Copyright (c) 2011 The OpenSSL Project.  All rights reserved.
 + *
@@ -10341,7 +10395,7 @@ index 0000000..6f2ccc6
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -10385,6 +10439,8 @@ index 0000000..6f2ccc6
 +#include <openssl/crypto.h>
 +#include <openssl/rand.h>
 +#include <openssl/err.h>
++
++#ifdef OPENSSL_FIPS
 +#include <openssl/fips.h>
 +#include <openssl/fips_rand.h>
 +#include "e_os.h"
@@ -10514,9 +10570,10 @@ index 0000000..6f2ccc6
 +    }
 +    return 0;
 +}
++#endif
 diff --git a/crypto/fips/fips_rand_selftest.c b/crypto/fips/fips_rand_selftest.c
 new file mode 100644
-index 0000000..d88fdf7
+index 0000000..4087357
 --- /dev/null
 +++ b/crypto/fips/fips_rand_selftest.c
 @@ -0,0 +1,176 @@
@@ -10528,7 +10585,7 @@ index 0000000..d88fdf7
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -10571,12 +10628,12 @@ index 0000000..d88fdf7
 +
 +#include <string.h>
 +#include <openssl/err.h>
-+#include <openssl/fips.h>
 +#include <openssl/rand.h>
-+#include <openssl/fips_rand.h>
-+#include "fips_locl.h"
 +
 +#ifdef OPENSSL_FIPS
++#include <openssl/fips.h>
++#include <openssl/fips_rand.h>
++#include "fips_locl.h"
 +
 +typedef struct {
 +    unsigned char DT[16];
@@ -10698,7 +10755,7 @@ index 0000000..d88fdf7
 +#endif
 diff --git a/crypto/fips/fips_randtest.c b/crypto/fips/fips_randtest.c
 new file mode 100644
-index 0000000..283f5bd
+index 0000000..8c4a1fc
 --- /dev/null
 +++ b/crypto/fips/fips_randtest.c
 @@ -0,0 +1,247 @@
@@ -10708,21 +10765,21 @@ index 0000000..283f5bd
 + * This package is an SSL implementation written
 + * by Eric Young (eay@cryptsoft.com).
 + * The implementation was written so as to conform with Netscapes SSL.
-+ * 
++ *
 + * This library is free for commercial and non-commercial use as long as
 + * the following conditions are aheared to.  The following conditions
 + * apply to all code found in this distribution, be it the RC4, RSA,
 + * lhash, DES, etc., code; not just the SSL code.  The SSL documentation
 + * included with this distribution is covered by the same copyright terms
 + * except that the holder is Tim Hudson (tjh@cryptsoft.com).
-+ * 
++ *
 + * Copyright remains Eric Young's, and as such any Copyright notices in
 + * the code are not to be removed.
 + * If this package is used in a product, Eric Young should be given attribution
 + * as the author of the parts of the library used.
 + * This can be in the form of a textual message at program startup or
 + * in documentation (online or textual) provided with the package.
-+ * 
++ *
 + * Redistribution and use in source and binary forms, with or without
 + * modification, are permitted provided that the following conditions
 + * are met:
@@ -10737,7 +10794,7 @@ index 0000000..283f5bd
 + *     Eric Young (eay@cryptsoft.com)"
 + *    The word 'cryptographic' can be left out if the rouines from the library
 + *    being used are not cryptographic related :-).
-+ * 4. If you include any Windows specific code (or a derivative thereof) from 
++ * 4. If you include any Windows specific code (or a derivative thereof) from
 + *    the apps directory (application code) you must include an acknowledgement:
 + *    "This product includes software written by Tim Hudson (tjh@cryptsoft.com)"
 + * 
@@ -10752,7 +10809,7 @@ index 0000000..283f5bd
 + * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 + * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 + * SUCH DAMAGE.
-+ * 
++ *
 + * The licence and distribution terms for any publically available version or
 + * derivative of this code cannot be changed.  i.e. this code cannot simply be
 + * copied and put under another distribution licence
@@ -10766,7 +10823,7 @@ index 0000000..283f5bd
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -10951,7 +11008,7 @@ index 0000000..283f5bd
 +#endif
 diff --git a/crypto/fips/fips_rsa_selftest.c b/crypto/fips/fips_rsa_selftest.c
 new file mode 100644
-index 0000000..e87fbda
+index 0000000..3b4af76
 --- /dev/null
 +++ b/crypto/fips/fips_rsa_selftest.c
 @@ -0,0 +1,444 @@
@@ -10963,7 +11020,7 @@ index 0000000..e87fbda
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -11401,7 +11458,7 @@ index 0000000..e87fbda
 +#endif                          /* def OPENSSL_FIPS */
 diff --git a/crypto/fips/fips_rsa_x931g.c b/crypto/fips/fips_rsa_x931g.c
 new file mode 100644
-index 0000000..c70e272
+index 0000000..2891dae
 --- /dev/null
 +++ b/crypto/fips/fips_rsa_x931g.c
 @@ -0,0 +1,273 @@
@@ -11412,21 +11469,21 @@ index 0000000..c70e272
 + * This package is an SSL implementation written
 + * by Eric Young (eay@cryptsoft.com).
 + * The implementation was written so as to conform with Netscapes SSL.
-+ * 
++ *
 + * This library is free for commercial and non-commercial use as long as
 + * the following conditions are aheared to.  The following conditions
 + * apply to all code found in this distribution, be it the RC4, RSA,
 + * lhash, DES, etc., code; not just the SSL code.  The SSL documentation
 + * included with this distribution is covered by the same copyright terms
 + * except that the holder is Tim Hudson (tjh@cryptsoft.com).
-+ * 
++ *
 + * Copyright remains Eric Young's, and as such any Copyright notices in
 + * the code are not to be removed.
 + * If this package is used in a product, Eric Young should be given attribution
 + * as the author of the parts of the library used.
 + * This can be in the form of a textual message at program startup or
 + * in documentation (online or textual) provided with the package.
-+ * 
++ *
 + * Redistribution and use in source and binary forms, with or without
 + * modification, are permitted provided that the following conditions
 + * are met:
@@ -11441,10 +11498,10 @@ index 0000000..c70e272
 + *     Eric Young (eay@cryptsoft.com)"
 + *    The word 'cryptographic' can be left out if the rouines from the library
 + *    being used are not cryptographic related :-).
-+ * 4. If you include any Windows specific code (or a derivative thereof) from 
++ * 4. If you include any Windows specific code (or a derivative thereof) from
 + *    the apps directory (application code) you must include an acknowledgement:
 + *    "This product includes software written by Tim Hudson (tjh@cryptsoft.com)"
-+ * 
++ *
 + * THIS SOFTWARE IS PROVIDED BY ERIC YOUNG ``AS IS'' AND
 + * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 + * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -11456,7 +11513,7 @@ index 0000000..c70e272
 + * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 + * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 + * SUCH DAMAGE.
-+ * 
++ *
 + * The licence and distribution terms for any publically available version or
 + * derivative of this code cannot be changed.  i.e. this code cannot simply be
 + * copied and put under another distribution licence
@@ -11536,7 +11593,7 @@ index 0000000..c70e272
 +        return 2;
 +    }
 +
-+    /* Since both primes are set we can now calculate all remaining 
++    /* Since both primes are set we can now calculate all remaining
 +     * components.
 +     */
 +
@@ -11680,7 +11737,7 @@ index 0000000..c70e272
 +}
 diff --git a/crypto/fips/fips_sha_selftest.c b/crypto/fips/fips_sha_selftest.c
 new file mode 100644
-index 0000000..446ddd9
+index 0000000..52dda4d
 --- /dev/null
 +++ b/crypto/fips/fips_sha_selftest.c
 @@ -0,0 +1,145 @@
@@ -11692,7 +11749,7 @@ index 0000000..446ddd9
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -11831,7 +11888,7 @@ index 0000000..446ddd9
 +#endif
 diff --git a/crypto/fips/fips_standalone_hmac.c b/crypto/fips/fips_standalone_hmac.c
 new file mode 100644
-index 0000000..ffc3411
+index 0000000..0864c48
 --- /dev/null
 +++ b/crypto/fips/fips_standalone_hmac.c
 @@ -0,0 +1,268 @@
@@ -11843,7 +11900,7 @@ index 0000000..ffc3411
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -12105,10 +12162,10 @@ index 0000000..ffc3411
 +}
 diff --git a/crypto/fips/fips_test_suite.c b/crypto/fips/fips_test_suite.c
 new file mode 100644
-index 0000000..1e4b69c
+index 0000000..d86351c
 --- /dev/null
 +++ b/crypto/fips/fips_test_suite.c
-@@ -0,0 +1,639 @@
+@@ -0,0 +1,633 @@
 +/* ====================================================================
 + * Copyright (c) 2003 The OpenSSL Project.  All rights reserved.
 + *
@@ -12148,7 +12205,7 @@ index 0000000..1e4b69c
 +#else
 +
 +# include <openssl/fips.h>
-+# include "fips_utl.h"
++/* # include "fips_utl.h" */
 +
 +/* AES: encrypt and decrypt known plaintext, verify result matches original plaintext
 +*/
@@ -12574,6 +12631,11 @@ index 0000000..1e4b69c
 +    return msg;
 +}
 +
++static void test_msg(const char *msg, int result)
++{
++    printf("%s...%s\n", msg, result ? "successful" : Fail("Failed!"));
++}
++
 +int main(int argc, char **argv)
 +{
 +
@@ -12650,8 +12712,7 @@ index 0000000..1e4b69c
 +    /* Non-Approved cryptographic operation
 +     */
 +    printf("1. Non-Approved cryptographic operation test...\n");
-+    printf("\ta. Included algorithm (D-H)...");
-+    printf(dh_test()? "successful\n" : Fail("FAILED!\n"));
++    test_msg("\ta. Included algorithm (D-H)...", dh_test());
 +
 +    /* Power-up self test
 +     */
@@ -12659,7 +12720,7 @@ index 0000000..1e4b69c
 +    printf("2. Automatic power-up self test...");
 +    if (!FIPS_mode_set(1)) {
 +        do_print_errors();
-+        printf(Fail("FAILED!\n"));
++	printf("%s\n", Fail("FAILED!"));
 +        exit(1);
 +    }
 +    printf("successful\n");
@@ -12672,75 +12733,65 @@ index 0000000..1e4b69c
 +
 +    /* AES encryption/decryption
 +     */
-+    printf("3. AES encryption/decryption...");
-+    printf(FIPS_aes_test()? "successful\n" : Fail("FAILED!\n"));
++    test_msg("3. AES encryption/decryption", FIPS_aes_test());
 +
 +    /* RSA key generation and encryption/decryption
 +     */
-+    printf("4. RSA key generation and encryption/decryption...");
-+    printf(FIPS_rsa_test(bad_rsa) ? "successful\n" : Fail("FAILED!\n"));
++    test_msg("4. RSA key generation and encryption/decryption",
++             FIPS_rsa_test(bad_rsa));
 +
 +    /* DES-CBC encryption/decryption
 +     */
-+    printf("5. DES-ECB encryption/decryption...");
-+    printf(FIPS_des3_test()? "successful\n" : Fail("FAILED!\n"));
++    test_msg("5. DES-ECB encryption/decryption", FIPS_des3_test());
 +
 +    /* DSA key generation and signature validation
 +     */
-+    printf("6. DSA key generation and signature validation...");
-+    printf(FIPS_dsa_test(bad_dsa) ? "successful\n" : Fail("FAILED!\n"));
++    test_msg("6. DSA key generation and signature validation",
++             FIPS_dsa_test(bad_dsa));
 +
 +    /* SHA-1 hash
 +     */
-+    printf("7a. SHA-1 hash...");
-+    printf(FIPS_sha1_test()? "successful\n" : Fail("FAILED!\n"));
++    test_msg("7a. SHA-1 hash", FIPS_sha1_test());
 +
 +    /* SHA-256 hash
 +     */
-+    printf("7b. SHA-256 hash...");
-+    printf(FIPS_sha256_test()? "successful\n" : Fail("FAILED!\n"));
++    test_msg("7b. SHA-256 hash", FIPS_sha256_test());
 +
 +    /* SHA-512 hash
 +     */
-+    printf("7c. SHA-512 hash...");
-+    printf(FIPS_sha512_test()? "successful\n" : Fail("FAILED!\n"));
++    test_msg("7c. SHA-512 hash", FIPS_sha512_test());
 +
 +    /* HMAC-SHA-1 hash
 +     */
-+    printf("7d. HMAC-SHA-1 hash...");
-+    printf(FIPS_hmac_sha1_test()? "successful\n" : Fail("FAILED!\n"));
++    test_msg("7d. HMAC-SHA-1 hash", FIPS_hmac_sha1_test());
 +
 +    /* HMAC-SHA-224 hash
 +     */
-+    printf("7e. HMAC-SHA-224 hash...");
-+    printf(FIPS_hmac_sha224_test()? "successful\n" : Fail("FAILED!\n"));
++    test_msg("7e. HMAC-SHA-224 hash", FIPS_hmac_sha224_test());
 +
 +    /* HMAC-SHA-256 hash
 +     */
-+    printf("7f. HMAC-SHA-256 hash...");
-+    printf(FIPS_hmac_sha256_test()? "successful\n" : Fail("FAILED!\n"));
++    test_msg("7f. HMAC-SHA-256 hash", FIPS_hmac_sha256_test());
 +
 +    /* HMAC-SHA-384 hash
 +     */
-+    printf("7g. HMAC-SHA-384 hash...");
-+    printf(FIPS_hmac_sha384_test()? "successful\n" : Fail("FAILED!\n"));
++    test_msg("7g. HMAC-SHA-384 hash", FIPS_hmac_sha384_test());
 +
 +    /* HMAC-SHA-512 hash
 +     */
-+    printf("7h. HMAC-SHA-512 hash...");
-+    printf(FIPS_hmac_sha512_test()? "successful\n" : Fail("FAILED!\n"));
++    test_msg("7h. HMAC-SHA-512 hash", FIPS_hmac_sha512_test());
 +
 +    /* Non-Approved cryptographic operation
 +     */
 +    printf("8. Non-Approved cryptographic operation test...\n");
-+    printf("\ta. Included algorithm (D-H)...");
-+    printf(dh_test()? "successful as expected\n"
++    printf("\ta. Included algorithm (D-H)...%s\n",
++           dh_test()? "successful as expected\n"
 +           : Fail("failed INCORRECTLY!\n"));
 +
 +    /* Zeroization
 +     */
-+    printf("9. Zero-ization...\n");
-+    printf(Zeroize()? "\tsuccessful as expected\n"
++    printf("9. Zero-ization...\n\t%s\n",
++           Zeroize()? "\tsuccessful as expected"
 +           : Fail("\tfailed INCORRECTLY!\n"));
 +
 +    printf("\nAll tests completed with %d errors\n", Error);
@@ -12965,10 +13016,10 @@ index 2088388..2f754ef 100644
 +    OPENSSL_init_library();
 +}
 diff --git a/crypto/opensslconf.h.in b/crypto/opensslconf.h.in
-index 7a1c85d..e86ec45 100644
+index 7a1c85d..814e4ee 100644
 --- a/crypto/opensslconf.h.in
 +++ b/crypto/opensslconf.h.in
-@@ -1,5 +1,20 @@
+@@ -1,5 +1,21 @@
  /* crypto/opensslconf.h.in */
  
 +#ifdef OPENSSL_DOING_MAKEDEPEND
@@ -12976,8 +13027,9 @@ index 7a1c85d..e86ec45 100644
 +/* Include any symbols here that have to be explicitly set to enable a feature
 + * that should be visible to makedepend.
 + *
-+ * [Our "make depend" doesn't actually look at this, we use actual build settings
-+ * instead; we want to make it easy to remove subdirectories with disabled algorithms.]
++ * [Our "make depend" doesn't actually look at this, we use actual build
++ * settings. Instead; we want to make it easy to remove subdirectories with
++ * disabled algorithms.]
 + */
 +
 +#ifndef OPENSSL_FIPS
@@ -12990,18 +13042,22 @@ index 7a1c85d..e86ec45 100644
  #undef I386_ONLY
  
 diff --git a/crypto/rand/md_rand.c b/crypto/rand/md_rand.c
-index 9e0064e..9d6b8b0 100644
+index 9e0064e..f443cf9 100644
 --- a/crypto/rand/md_rand.c
 +++ b/crypto/rand/md_rand.c
-@@ -391,7 +391,10 @@ int ssleay_rand_bytes(unsigned char *buf, int num, int pseudo, int lock)
+@@ -391,7 +391,14 @@ int ssleay_rand_bytes(unsigned char *buf, int num, int pseudo, int lock)
      CRYPTO_w_unlock(CRYPTO_LOCK_RAND2);
      crypto_lock_rand = 1;
  
 -    if (!initialized) {
-+    /* always poll for external entropy in FIPS mode, drbg provides the 
++    /* always poll for external entropy in FIPS mode, drbg provides the
 +     * expansion
 +     */
++#ifdef OPENSSL_FIPS
 +    if (!initialized || FIPS_module_mode()) {
++#else
++        if (!initialized) {
++#endif
          RAND_poll();
          initialized = 1;
      }
@@ -13785,6 +13841,26 @@ index e33bb4f..050b281 100644
  {
      memset(c, 0, sizeof(*c));
      return (1);
+diff --git a/openssl.ld b/openssl.ld
+index 8d40f31..dcbfdac 100644
+--- a/openssl.ld
++++ b/openssl.ld
+@@ -4617,5 +4617,15 @@ OPENSSL_1.0.2g {
+        global:
+                SRP_VBASE_get1_by_user;
+                SRP_user_pwd_free;
++               OPENSSL_init_library;
++               private_BF_set_key;
++               private_CAST_set_key;
++               private_idea_set_encrypt_key;
++               private_SEED_set_key;
++               private_RC2_set_key;
++               private_RC4_set_key;
++               private_AES_set_encrypt_key;
++               private_AES_set_decrypt_key;
++               private_Camellia_set_key;
+ } OPENSSL_1.0.2;
+ 
 diff --git a/ssl/ssl_algs.c b/ssl/ssl_algs.c
 index e6f515f..34c0ab9 100644
 --- a/ssl/ssl_algs.c

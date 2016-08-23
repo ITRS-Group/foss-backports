@@ -1,12 +1,8 @@
-commit be78d827c798d847bf5664f3d30f3f5ecbf214dd
-Author: Joy Latten <joy.latten@canonical.com>
-Date:   Wed Apr 13 22:58:04 2016 -0500
-
-    From: Joy Latten <joy.latten@canonical.com>
-    Description: [PATCH 5/6] More fips 140-2 requirements
-    Bug-Ubuntu: http://bugs.launchpad.net/bugs/1553309
-    Forwarded: not-needed
-    Origin: vendor, http://pkgs.fedoraproject.org/cgit/rpms/openssl.git
+From: Joy Latten <joy.latten@canonical.com>
+Description: [PATCH 5/6] More fips 140-2 requirements
+Bug-Ubuntu: http://bugs.launchpad.net/bugs/1553309
+Forwarded: not-needed
+Origin: vendor, https://dl.fedoraproject.org/pub/fedora/linux/development
 
 diff --git a/crypto/dh/dh.h b/crypto/dh/dh.h
 index 7ae5079..cd08b18 100644
@@ -58,7 +54,7 @@ index 7c78c5a..4abe46c 100644
   */
  # define DSA_is_prime(n, callback, cb_arg) \
 diff --git a/crypto/dsa/dsa_gen.c b/crypto/dsa/dsa_gen.c
-index 96c4c09..ca86915 100644
+index 5847247..cd6a64c 100644
 --- a/crypto/dsa/dsa_gen.c
 +++ b/crypto/dsa/dsa_gen.c
 @@ -157,9 +157,11 @@ int dsa_builtin_paramgen(DSA *ret, size_t bits, size_t qbits,
@@ -90,7 +86,7 @@ index e1307b0..f235fce 100644
          goto err;
      }
 diff --git a/crypto/fips/Makefile b/crypto/fips/Makefile
-index 0b54447..8d4bf9a 100644
+index f2802e4..9c48503 100644
 --- a/crypto/fips/Makefile
 +++ b/crypto/fips/Makefile
 @@ -24,13 +24,15 @@ LIBSRC=fips_aes_selftest.c fips_des_selftest.c fips_hmac_selftest.c fips_rand_se
@@ -112,7 +108,7 @@ index 0b54447..8d4bf9a 100644
  LIBCRYPTO=-L.. -lcrypto
  
 diff --git a/crypto/fips/fips.c b/crypto/fips/fips.c
-index e5de012..c4602e2 100644
+index c1cdd2b..07d6ece 100644
 --- a/crypto/fips/fips.c
 +++ b/crypto/fips/fips.c
 @@ -418,26 +418,24 @@ int FIPS_module_mode_set(int onoff, const char *auth)
@@ -149,7 +145,7 @@ index e5de012..c4602e2 100644
          goto end;
      }
 diff --git a/crypto/fips/fips.h b/crypto/fips/fips.h
-index 9777a73..8c9be43 100644
+index fcc3e1c..38f0783 100644
 --- a/crypto/fips/fips.h
 +++ b/crypto/fips/fips.h
 @@ -96,6 +96,7 @@ extern "C" {
@@ -162,7 +158,7 @@ index 9777a73..8c9be43 100644
      void FIPS_x931_stick(int onoff);
 diff --git a/crypto/fips/fips_dh_selftest.c b/crypto/fips/fips_dh_selftest.c
 new file mode 100644
-index 0000000..2b1eb25
+index 0000000..91fe48d
 --- /dev/null
 +++ b/crypto/fips/fips_dh_selftest.c
 @@ -0,0 +1,162 @@
@@ -175,7 +171,7 @@ index 0000000..2b1eb25
 + * are met:
 + *
 + * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer. 
++ *    notice, this list of conditions and the following disclaimer.
 + *
 + * 2. Redistributions in binary form must reproduce the above copyright
 + *    notice, this list of conditions and the following disclaimer in
@@ -219,13 +215,13 @@ index 0000000..2b1eb25
 +#include <string.h>
 +#include <openssl/crypto.h>
 +#include <openssl/dh.h>
-+#include <openssl/fips.h>
 +#include <openssl/err.h>
 +#include <openssl/evp.h>
 +#include <openssl/bn.h>
-+#include "fips_locl.h"
 +
 +#ifdef OPENSSL_FIPS
++#include <openssl/fips.h>
++#include "fips_locl.h"
 +
 +static const unsigned char dh_test_2048_p[] = {
 +    0xAE, 0xEC, 0xEE, 0x22, 0xFA, 0x3A, 0xA5, 0x22, 0xC0, 0xDE, 0x0F, 0x09,
@@ -328,8 +324,425 @@ index 0000000..2b1eb25
 +    return ret;
 +}
 +#endif
+diff --git a/crypto/fips/fips_ecdh_selftest.c b/crypto/fips/fips_ecdh_selftest.c
+new file mode 100644
+index 0000000..775fc9f
+--- /dev/null
++++ b/crypto/fips/fips_ecdh_selftest.c
+@@ -0,0 +1,240 @@
++/* fips/ecdh/fips_ecdh_selftest.c */
++/* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
++ * project 2011.
++ */
++/* ====================================================================
++ * Copyright (c) 2011 The OpenSSL Project.  All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ *
++ * 3. All advertising materials mentioning features or use of this
++ *    software must display the following acknowledgment:
++ *    "This product includes software developed by the OpenSSL Project
++ *    for use in the OpenSSL Toolkit. (http://www.OpenSSL.org/)"
++ *
++ * 4. The names "OpenSSL Toolkit" and "OpenSSL Project" must not be used to
++ *    endorse or promote products derived from this software without
++ *    prior written permission. For written permission, please contact
++ *    licensing@OpenSSL.org.
++ *
++ * 5. Products derived from this software may not be called "OpenSSL"
++ *    nor may "OpenSSL" appear in their names without prior written
++ *    permission of the OpenSSL Project.
++ *
++ * 6. Redistributions of any form whatsoever must retain the following
++ *    acknowledgment:
++ *    "This product includes software developed by the OpenSSL Project
++ *    for use in the OpenSSL Toolkit (http://www.OpenSSL.org/)"
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE OpenSSL PROJECT ``AS IS'' AND ANY
++ * EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE OpenSSL PROJECT OR
++ * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
++ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
++ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
++ * OF THE POSSIBILITY OF SUCH DAMAGE.
++ * ====================================================================
++ *
++ */
++
++#define OPENSSL_FIPSAPI
++
++#include <string.h>
++#include <openssl/crypto.h>
++#include <openssl/ec.h>
++#include <openssl/ecdh.h>
++#include <openssl/err.h>
++#include <openssl/evp.h>
++#include <openssl/bn.h>
++
++#ifdef OPENSSL_FIPS
++#include <openssl/fips.h>
++# include "fips_locl.h"
++
++static const unsigned char p256_qcavsx[] = {
++    0x52, 0xc6, 0xa5, 0x75, 0xf3, 0x04, 0x98, 0xb3, 0x29, 0x66, 0x0c, 0x62,
++    0x18, 0x60, 0x55, 0x41, 0x59, 0xd4, 0x60, 0x85, 0x99, 0xc1, 0x51, 0x13,
++    0x6f, 0x97, 0x85, 0x93, 0x33, 0x34, 0x07, 0x50
++};
++
++static const unsigned char p256_qcavsy[] = {
++    0x6f, 0x69, 0x24, 0xeb, 0xe9, 0x3b, 0xa7, 0xcc, 0x47, 0x17, 0xaa, 0x3f,
++    0x70, 0xfc, 0x10, 0x73, 0x0a, 0xcd, 0x21, 0xee, 0x29, 0x19, 0x1f, 0xaf,
++    0xb4, 0x1c, 0x1e, 0xc2, 0x8e, 0x97, 0x81, 0x6e
++};
++
++static const unsigned char p256_qiutx[] = {
++    0x71, 0x46, 0x88, 0x08, 0x92, 0x21, 0x1b, 0x10, 0x21, 0x74, 0xff, 0x0c,
++    0x94, 0xde, 0x34, 0x7c, 0x86, 0x74, 0xbe, 0x67, 0x41, 0x68, 0xd4, 0xc1,
++    0xe5, 0x75, 0x63, 0x9c, 0xa7, 0x46, 0x93, 0x6f
++};
++
++static const unsigned char p256_qiuty[] = {
++    0x33, 0x40, 0xa9, 0x6a, 0xf5, 0x20, 0xb5, 0x9e, 0xfc, 0x60, 0x1a, 0xae,
++    0x3d, 0xf8, 0x21, 0xd2, 0xa7, 0xca, 0x52, 0x34, 0xb9, 0x5f, 0x27, 0x75,
++    0x6c, 0x81, 0xbe, 0x32, 0x4d, 0xba, 0xbb, 0xf8
++};
++
++static const unsigned char p256_qiutd[] = {
++    0x1a, 0x48, 0x55, 0x6b, 0x11, 0xbe, 0x92, 0xd4, 0x1c, 0xd7, 0x45, 0xc3,
++    0x82, 0x81, 0x51, 0xf1, 0x23, 0x40, 0xb7, 0x83, 0xfd, 0x01, 0x6d, 0xbc,
++    0xa1, 0x66, 0xaf, 0x0a, 0x03, 0x23, 0xcd, 0xc8
++};
++
++static const unsigned char p256_ziut[] = {
++    0x77, 0x2a, 0x1e, 0x37, 0xee, 0xe6, 0x51, 0x02, 0x71, 0x40, 0xf8, 0x6a,
++    0x36, 0xf8, 0x65, 0x61, 0x2b, 0x18, 0x71, 0x82, 0x23, 0xe6, 0xf2, 0x77,
++    0xce, 0xec, 0xb8, 0x49, 0xc7, 0xbf, 0x36, 0x4f
++};
++
++typedef struct {
++    int curve;
++    const unsigned char *x1;
++    size_t x1len;
++    const unsigned char *y1;
++    size_t y1len;
++    const unsigned char *d1;
++    size_t d1len;
++    const unsigned char *x2;
++    size_t x2len;
++    const unsigned char *y2;
++    size_t y2len;
++    const unsigned char *z;
++    size_t zlen;
++} ECDH_SELFTEST_DATA;
++
++# define make_ecdh_test(nid, pr) { nid, \
++                                pr##_qiutx, sizeof(pr##_qiutx), \
++                                pr##_qiuty, sizeof(pr##_qiuty), \
++                                pr##_qiutd, sizeof(pr##_qiutd), \
++                                pr##_qcavsx, sizeof(pr##_qcavsx), \
++                                pr##_qcavsy, sizeof(pr##_qcavsy), \
++                                pr##_ziut, sizeof(pr##_ziut) }
++
++static ECDH_SELFTEST_DATA test_ecdh_data[] = {
++    make_ecdh_test(NID_X9_62_prime256v1, p256),
++};
++
++int FIPS_selftest_ecdh(void)
++{
++    EC_KEY *ec1 = NULL, *ec2 = NULL;
++    const EC_POINT *ecp = NULL;
++    BIGNUM *x = NULL, *y = NULL, *d = NULL;
++    unsigned char *ztmp = NULL;
++    int rv = 1;
++    size_t i;
++
++    for (i = 0; i < sizeof(test_ecdh_data) / sizeof(ECDH_SELFTEST_DATA); i++) {
++        ECDH_SELFTEST_DATA *ecd = test_ecdh_data + i;
++        if (!fips_post_started(FIPS_TEST_ECDH, ecd->curve, 0))
++            continue;
++        ztmp = OPENSSL_malloc(ecd->zlen);
++
++        x = BN_bin2bn(ecd->x1, ecd->x1len, x);
++        y = BN_bin2bn(ecd->y1, ecd->y1len, y);
++        d = BN_bin2bn(ecd->d1, ecd->d1len, d);
++
++        if (!x || !y || !d || !ztmp) {
++            rv = -1;
++            goto err;
++        }
++
++        ec1 = EC_KEY_new_by_curve_name(ecd->curve);
++        if (!ec1) {
++            rv = -1;
++            goto err;
++        }
++        EC_KEY_set_flags(ec1, EC_FLAG_COFACTOR_ECDH);
++
++        if (!EC_KEY_set_public_key_affine_coordinates(ec1, x, y)) {
++            rv = -1;
++            goto err;
++        }
++
++        if (!EC_KEY_set_private_key(ec1, d)) {
++            rv = -1;
++            goto err;
++        }
++
++        x = BN_bin2bn(ecd->x2, ecd->x2len, x);
++        y = BN_bin2bn(ecd->y2, ecd->y2len, y);
++
++        if (!x || !y) {
++            rv = -1;
++            goto err;
++        }
++
++        ec2 = EC_KEY_new_by_curve_name(ecd->curve);
++        if (!ec2) {
++            rv = -1;
++            goto err;
++        }
++        EC_KEY_set_flags(ec1, EC_FLAG_COFACTOR_ECDH);
++
++        if (!EC_KEY_set_public_key_affine_coordinates(ec2, x, y)) {
++            rv = -1;
++            goto err;
++        }
++
++        ecp = EC_KEY_get0_public_key(ec2);
++        if (!ecp) {
++            rv = -1;
++            goto err;
++        }
++
++        if (!ECDH_compute_key(ztmp, ecd->zlen, ecp, ec1, 0)) {
++            rv = -1;
++            goto err;
++        }
++
++        if (!fips_post_corrupt(FIPS_TEST_ECDH, ecd->curve, NULL))
++            ztmp[0] ^= 0x1;
++
++        if (memcmp(ztmp, ecd->z, ecd->zlen)) {
++            rv = 0;
++        } else if (!fips_post_success(FIPS_TEST_ECDH, ecd->curve, 0))
++            goto err;
++
++        EC_KEY_free(ec1);
++        ec1 = NULL;
++        EC_KEY_free(ec2);
++        ec2 = NULL;
++        OPENSSL_free(ztmp);
++        ztmp = NULL;
++    }
++
++ err:
++
++    if (x)
++        BN_clear_free(x);
++    if (y)
++        BN_clear_free(y);
++    if (d)
++        BN_clear_free(d);
++    if (ec1)
++        EC_KEY_free(ec1);
++    if (ec2)
++        EC_KEY_free(ec2);
++    if (ztmp)
++        OPENSSL_free(ztmp);
++
++    return rv;
++
++}
++
++#endif
+diff --git a/crypto/fips/fips_ecdsa_selftest.c b/crypto/fips/fips_ecdsa_selftest.c
+new file mode 100644
+index 0000000..3fd35ae
+--- /dev/null
++++ b/crypto/fips/fips_ecdsa_selftest.c
+@@ -0,0 +1,165 @@
++/* fips/ecdsa/fips_ecdsa_selftest.c */
++/* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
++ * project 2011.
++ */
++/* ====================================================================
++ * Copyright (c) 2011 The OpenSSL Project.  All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ *
++ * 3. All advertising materials mentioning features or use of this
++ *    software must display the following acknowledgment:
++ *    "This product includes software developed by the OpenSSL Project
++ *    for use in the OpenSSL Toolkit. (http://www.OpenSSL.org/)"
++ *
++ * 4. The names "OpenSSL Toolkit" and "OpenSSL Project" must not be used to
++ *    endorse or promote products derived from this software without
++ *    prior written permission. For written permission, please contact
++ *    licensing@OpenSSL.org.
++ *
++ * 5. Products derived from this software may not be called "OpenSSL"
++ *    nor may "OpenSSL" appear in their names without prior written
++ *    permission of the OpenSSL Project.
++ *
++ * 6. Redistributions of any form whatsoever must retain the following
++ *    acknowledgment:
++ *    "This product includes software developed by the OpenSSL Project
++ *    for use in the OpenSSL Toolkit (http://www.OpenSSL.org/)"
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE OpenSSL PROJECT ``AS IS'' AND ANY
++ * EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE OpenSSL PROJECT OR
++ * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
++ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
++ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
++ * OF THE POSSIBILITY OF SUCH DAMAGE.
++ * ====================================================================
++ *
++ */
++
++#define OPENSSL_FIPSAPI
++
++#include <string.h>
++#include <openssl/crypto.h>
++#include <openssl/ec.h>
++#include <openssl/ecdsa.h>
++#include <openssl/err.h>
++#include <openssl/evp.h>
++#include <openssl/bn.h>
++
++#ifdef OPENSSL_FIPS
++#include <openssl/fips.h>
++
++static const char P_256_name[] = "ECDSA P-256";
++
++static const unsigned char P_256_d[] = {
++    0x51, 0xbd, 0x06, 0xa1, 0x1c, 0xda, 0xe2, 0x12, 0x99, 0xc9, 0x52, 0x3f,
++    0xea, 0xa4, 0xd2, 0xd1, 0xf4, 0x7f, 0xd4, 0x3e, 0xbd, 0xf8, 0xfc, 0x87,
++    0xdc, 0x82, 0x53, 0x21, 0xee, 0xa0, 0xdc, 0x64
++};
++
++static const unsigned char P_256_qx[] = {
++    0x23, 0x89, 0xe0, 0xf4, 0x69, 0xe0, 0x49, 0xe5, 0xc7, 0xe5, 0x40, 0x6e,
++    0x8f, 0x25, 0xdd, 0xad, 0x11, 0x16, 0x14, 0x9b, 0xab, 0x44, 0x06, 0x31,
++    0xbf, 0x5e, 0xa6, 0x44, 0xac, 0x86, 0x00, 0x07
++};
++
++static const unsigned char P_256_qy[] = {
++    0xb3, 0x05, 0x0d, 0xd0, 0xdc, 0xf7, 0x40, 0xe6, 0xf9, 0xd8, 0x6d, 0x7b,
++    0x63, 0xca, 0x97, 0xe6, 0x12, 0xf9, 0xd4, 0x18, 0x59, 0xbe, 0xb2, 0x5e,
++    0x4a, 0x6a, 0x77, 0x23, 0xf4, 0x11, 0x9d, 0xeb
++};
++
++typedef struct {
++    int curve;
++    const char *name;
++    const unsigned char *x;
++    size_t xlen;
++    const unsigned char *y;
++    size_t ylen;
++    const unsigned char *d;
++    size_t dlen;
++} EC_SELFTEST_DATA;
++
++# define make_ecdsa_test(nid, pr) { nid, pr##_name, \
++                                pr##_qx, sizeof(pr##_qx), \
++                                pr##_qy, sizeof(pr##_qy), \
++                                pr##_d, sizeof(pr##_d)}
++
++static EC_SELFTEST_DATA test_ec_data[] = {
++    make_ecdsa_test(NID_X9_62_prime256v1, P_256),
++};
++
++int FIPS_selftest_ecdsa()
++{
++    EC_KEY *ec = NULL;
++    BIGNUM *x = NULL, *y = NULL, *d = NULL;
++    EVP_PKEY *pk = NULL;
++    int rv = 0;
++    size_t i;
++
++    for (i = 0; i < sizeof(test_ec_data) / sizeof(EC_SELFTEST_DATA); i++) {
++        EC_SELFTEST_DATA *ecd = test_ec_data + i;
++
++        x = BN_bin2bn(ecd->x, ecd->xlen, x);
++        y = BN_bin2bn(ecd->y, ecd->ylen, y);
++        d = BN_bin2bn(ecd->d, ecd->dlen, d);
++
++        if (!x || !y || !d)
++            goto err;
++
++        ec = EC_KEY_new_by_curve_name(ecd->curve);
++        if (!ec)
++            goto err;
++
++        if (!EC_KEY_set_public_key_affine_coordinates(ec, x, y))
++            goto err;
++
++        if (!EC_KEY_set_private_key(ec, d))
++            goto err;
++
++        if ((pk = EVP_PKEY_new()) == NULL)
++            goto err;
++
++        EVP_PKEY_assign_EC_KEY(pk, ec);
++
++        if (!fips_pkey_signature_test(pk, NULL, 0,
++                                      NULL, 0, EVP_sha256(), 0, ecd->name))
++            goto err;
++    }
++
++    rv = 1;
++
++ err:
++
++    if (x)
++        BN_clear_free(x);
++    if (y)
++        BN_clear_free(y);
++    if (d)
++        BN_clear_free(d);
++    if (pk)
++        EVP_PKEY_free(pk);
++    else if (ec)
++        EC_KEY_free(ec);
++
++    return rv;
++
++}
++
++#endif
 diff --git a/crypto/fips/fips_post.c b/crypto/fips/fips_post.c
-index b9354db..2b19651 100644
+index f410c9e..de1dd4d 100644
 --- a/crypto/fips/fips_post.c
 +++ b/crypto/fips/fips_post.c
 @@ -99,6 +99,8 @@ int FIPS_selftest(void)
@@ -342,7 +755,7 @@ index b9354db..2b19651 100644
          rv = 0;
      return rv;
 diff --git a/crypto/fips/fips_rsa_selftest.c b/crypto/fips/fips_rsa_selftest.c
-index e87fbda..3f918b7 100644
+index 3b4af76..d625c05 100644
 --- a/crypto/fips/fips_rsa_selftest.c
 +++ b/crypto/fips/fips_rsa_selftest.c
 @@ -60,68 +60,107 @@
