@@ -1,8 +1,6 @@
-OpenSSL 1.0.2g for Geneos v3.7.0
-================================
+# OpenSSL 1.0.2g for Geneos v3.7.0
 
-Origin
-------
+## Origin
 
 This was mostly taken from openssl 1.0.2g-1ubuntu4.1 source package in Ubuntu 16.04
 
@@ -13,15 +11,13 @@ OpenSSL 1.0.2g and [Ubuntu 16.04's OpenSSL 1.0.2g](https://launchpad.net/ubuntu/
 source package are the same given the SHA256 checksum.
 
 
-ITRS-specific changes
----------------------
+## ITRS-specific changes
 
 * Support classic ELF ".hash" and ".gnu.hash" hash tables in the linker
 * Disable native chip optimization when building OpenSSL with Solaris Studio 12.3
 * Remove FIPS patches introduced by Canonical Inc. to enable AIX builds (merely disabling does not work).
 
-Build Environment
------------------
+## Build Environment
 
 * Linux x86: GCC 3.4.6 (from compat-gcc34-c++ package) on RHEL 5.11
 * Linux x86_64: GCC 4.1.2 (vendor) on RHEL 5.11
@@ -31,48 +27,72 @@ Build Environment
 * Windows x86: Visual Studio 2010 SP1 on Windows Server 2008 SP2
 
 
-Configuration
--------------
+## Configuration
 
-Linux x86 
+### Linux x86 
+
+```
   ./config shared -I/usr/lib/gcc/i386-redhat-linux/3.4.6/include no-ssl2 no-ssl3 no-asm enable-tlsext
   make
+```
 
-Linux x86_64
+### Linux x86_64
+
+```
   ./config shared no-ssl2 no-ssl3 no-asm enable-tlsext
   make
+```
 
-Solaris x86
+### Solaris x86
+
+```
   ./Configure solaris64-x86-cc shared no-ssl2 no-ssl3 no-asm enable-tlsext
   make
+```
 
-Solaris x86_64
+### Solaris x86_64
+
+```
   ./Configure solaris64-x86_64-cc shared no-ssl2 no-ssl3 no-asm enable-tlsext
   make
+```
 
-Solaris SPARC
+### Solaris SPARC
+
+```
   ./Configure solaris-sparcv9-cc shared no-ssl2 no-ssl3 no-asm enable-tlsext
   make
+```
 
-Solaris SPARC64
+### Solaris SPARC64
+
+```
   ./Configure solaris64-sparcv9-cc shared no-ssl2 no-ssl3 no-asm enable-tlsext
   make
+```
 
-AIX PPC
+### AIX PPC
+
+```
   ./Configure aix-cc shared no-ssl2 no-ssl3 no-asm enable-tlsext
   make
+```
 
-AIX PPC64
+### AIX PPC64
+
+```
   ./Configure aix64-x86_64-cc shared no-ssl2 no-ssl3 no-asm enable-tlsext
+  make
+```
 
-Windows x86
+### Windows x86
+```
   perl Configure VC-WIN32 no-asm enable-tlsext enable-capieng
   ms\do_nt
   nmake -f ms\ntdll.mak
+```
 
-
-Backported fixes
-----------------
+## Backported fixes
 
 * EVP_EncodeUpdate overflow (CVE-2016-2105)
 * EVP_EncryptUpdate overflow (CVE-2016-2106)
