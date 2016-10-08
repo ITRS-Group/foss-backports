@@ -17,3 +17,11 @@ Applying patches
 ----------------
 
 Patches are named in order of application. You can then apply the patches to upstream package distribution
+
+Downloads
+---------
+
+Downloads are provided in the "Releases" tab for the Github project.
+
+A summary of downloadable packages per version are provided in the "checksum" directory. These are clear-signed using
+the ITRS DevOps PGP key - please import the itrs.asc public key to verify the signed content. 
